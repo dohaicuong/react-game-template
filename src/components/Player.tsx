@@ -1,57 +1,21 @@
 import { useTexture } from '@react-three/drei'
 import { useFrame } from '@react-three/fiber'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { LinearMipMapLinearFilter, NearestFilter, Sprite, Texture, Vector2 } from 'three'
-
-const usePrepareTexture = (texture: Texture, [frameWidth, frameHeight]: [number, number]) => {
-  useEffect(() => {
-    texture.magFilter = NearestFilter
-    texture.minFilter = LinearMipMapLinearFilter
-
-    texture.repeat = new Vector2(
-      1 / (texture.image.width / frameWidth),
-      1 / (texture.image.height / frameHeight)
-    )
-
-    const xFrame = 0
-    const yFrame = 11
-    texture.offset = new Vector2(
-      xFrame * frameWidth / texture.image.width,
-      yFrame * frameHeight / texture.image.height,
-    )
-  }, [])
-}
 
 const frameWidth = 48
 const frameHeight = 48
+const frameRate = 250
 
 const Player = () => {
   const playerRef = useRef<Sprite>()
   const texture = useTexture('assets/heroes/sprites/sorc.png')
 
-  const actions = usePrepareTexture(texture, [frameWidth, frameHeight])
-
-  const interval = useRef<number>()
-  const currentFrame = useRef<number>(0)
-  const currentDirectionFrame = useRef<number>(11)
-  const frameRate = 250
-  useFrame(({ clock }) => {
-    if (interval.current === undefined) interval.current = clock.oldTime
-
-    if (clock.oldTime >= interval.current + frameRate) {
-      interval.current = clock.oldTime
-
-      currentFrame.current = currentFrame.current === 3
-        ? 0
-        : currentFrame.current + 1
-
-      if (!playerRef.current?.material.map) return
-
-      playerRef.current.material.map.offset.x = currentFrame.current * frameWidth / texture.image.width
-    }
-  })
+  usePrepareTexture(texture, [frameWidth, frameHeight])
+  useAnimateTexture(playerRef, frameRate)
   
-  const { forward, backward, left, right } = usePersonControls()
+  const currentDirectionFrame = useRef<number>(11)
+  const { forward, backward, left, right, attack } = usePersonControls()
   const movingSpeed = 0.1
 
   useFrame(() => {
@@ -72,7 +36,7 @@ const Player = () => {
       backward ? 11 :
       left ? 10 :
       right ? 9 :
-      currentDirectionFrame.current  
+      currentDirectionFrame.current
     
     texture.offset.y = currentDirectionFrame.current * frameHeight / texture.image.height
   }, [forward, backward, left, right])
@@ -92,6 +56,7 @@ const keys: { [name: string]: string } = {
   KeyS: 'backward',
   KeyA: 'left',
   KeyD: 'right',
+  KeyJ: 'attack',
 }
 const usePersonControls = () => {
   const moveFieldByKey = (key: any) => keys[key]
@@ -101,6 +66,7 @@ const usePersonControls = () => {
     backward: false,
     left: false,
     right: false,
+    attack: false
   })
 
   useEffect(() => {
@@ -118,4 +84,44 @@ const usePersonControls = () => {
     }
   }, [])
   return movement
+}
+
+const usePrepareTexture = (texture: Texture, [frameWidth, frameHeight]: [number, number]) => {
+  useEffect(() => {
+    texture.magFilter = NearestFilter
+    texture.minFilter = LinearMipMapLinearFilter
+
+    texture.repeat = new Vector2(
+      1 / (texture.image.width / frameWidth),
+      1 / (texture.image.height / frameHeight)
+    )
+
+    const xFrame = 0
+    const yFrame = 11
+    texture.offset = new Vector2(
+      xFrame * frameWidth / texture.image.width,
+      yFrame * frameHeight / texture.image.height,
+    )
+  }, [])
+}
+
+const useAnimateTexture = (playerRef: React.MutableRefObject<Sprite | undefined>, frameRate: number) => {
+  const interval = useRef<number>()
+  const currentFrame = useRef<number>(0)
+
+  useFrame(({ clock }) => {
+    if (interval.current === undefined) interval.current = clock.oldTime
+
+    if (clock.oldTime >= interval.current + frameRate) {
+      interval.current = clock.oldTime
+
+      currentFrame.current = currentFrame.current === 3
+        ? 0
+        : currentFrame.current + 1
+
+      if (!playerRef.current?.material.map) return
+
+      playerRef.current.material.map.offset.x = currentFrame.current * frameWidth / playerRef.current.material.map.image.width
+    }
+  })
 }
