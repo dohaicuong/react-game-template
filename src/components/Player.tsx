@@ -1,19 +1,12 @@
 import { useTexture } from '@react-three/drei'
 import { useFrame } from '@react-three/fiber'
-import { useEffect, useRef } from 'react'
-import { LinearMipMapLinearFilter, NearestFilter, Vector2 } from 'three'
-import { useKeyPress } from 'react-use'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { LinearMipMapLinearFilter, NearestFilter, Sprite, Texture, Vector2 } from 'three'
 
-const keys = ['w', 's', 'a', 'd']
-
-const Player = () => {
-  const texture = useTexture('assets/heroes/sprites/Sorcerer_idle.png')
+const usePrepareTexture = (texture: Texture, [frameWidth, frameHeight]: [number, number]) => {
   useEffect(() => {
     texture.magFilter = NearestFilter
     texture.minFilter = LinearMipMapLinearFilter
-
-    const frameWidth = texture.image.width / 4
-    const frameHeight = texture.image.height / 4
 
     texture.repeat = new Vector2(
       1 / (texture.image.width / frameWidth),
@@ -21,16 +14,26 @@ const Player = () => {
     )
 
     const xFrame = 0
-    const yFrame = 3
+    const yFrame = 11
     texture.offset = new Vector2(
       xFrame * frameWidth / texture.image.width,
       yFrame * frameHeight / texture.image.height,
     )
   }, [])
+}
+
+const frameWidth = 48
+const frameHeight = 48
+
+const Player = () => {
+  const playerRef = useRef<Sprite>()
+  const texture = useTexture('assets/heroes/sprites/sorc.png')
+
+  const actions = usePrepareTexture(texture, [frameWidth, frameHeight])
 
   const interval = useRef<number>()
   const currentFrame = useRef<number>(0)
-  const currentDirectionFrame = useRef<number>(3)
+  const currentDirectionFrame = useRef<number>(11)
   const frameRate = 250
   useFrame(({ clock }) => {
     if (interval.current === undefined) interval.current = clock.oldTime
@@ -42,31 +45,40 @@ const Player = () => {
         ? 0
         : currentFrame.current + 1
 
-      const frameWidth = texture.image.width / 4
-      const frameHeight = texture.image.height / 4
+      if (!playerRef.current?.material.map) return
 
-      texture.offset = new Vector2(
-        currentFrame.current * frameWidth / texture.image.width,
-        currentDirectionFrame.current * frameHeight / texture.image.height,
-      )
+      playerRef.current.material.map.offset.x = currentFrame.current * frameWidth / texture.image.width
     }
   })
+  
+  const { forward, backward, left, right } = usePersonControls()
+  const movingSpeed = 0.1
 
-  useKeyPress((event) => {
-    const newYFrame =
-      event.key === 'w' ? 0 :
-      event.key === 'd' ? 1 :
-      event.key === 'a' ? 2 :
-      event.key === 's' ? 3 :
-      currentDirectionFrame.current
+  useFrame(() => {
+    if (!forward && !backward && !left && !right) return
+    if (!playerRef.current) return
 
-    currentDirectionFrame.current = newYFrame
-
-    return true
+    if (forward) playerRef.current.position.y += movingSpeed
+    if (backward) playerRef.current.position.y -= movingSpeed
+    if (right) playerRef.current.position.x += movingSpeed
+    if (left) playerRef.current.position.x -= movingSpeed
   })
 
+  useEffect(() => {
+    if (!playerRef.current?.material.map) return
+    
+    currentDirectionFrame.current =
+      forward ? 8 :
+      backward ? 11 :
+      left ? 10 :
+      right ? 9 :
+      currentDirectionFrame.current  
+    
+    texture.offset.y = currentDirectionFrame.current * frameHeight / texture.image.height
+  }, [forward, backward, left, right])
+  
   return (
-    <sprite position={[0, -2, 1]} scale={3}>
+    <sprite position={[0, -2, 1]} scale={3} ref={playerRef}>
       <boxGeometry />
       <spriteMaterial map={texture} />
     </sprite>
@@ -74,3 +86,36 @@ const Player = () => {
 }
 
 export default Player
+
+const keys: { [name: string]: string } = {
+  KeyW: 'forward',
+  KeyS: 'backward',
+  KeyA: 'left',
+  KeyD: 'right',
+}
+const usePersonControls = () => {
+  const moveFieldByKey = (key: any) => keys[key]
+
+  const [movement, setMovement] = useState({
+    forward: false,
+    backward: false,
+    left: false,
+    right: false,
+  })
+
+  useEffect(() => {
+    const handleKeyDown = (e: any) => {
+      setMovement((m) => ({ ...m, [moveFieldByKey(e.code)]: true }))
+    }
+    const handleKeyUp = (e: any) => {
+      setMovement((m) => ({ ...m, [moveFieldByKey(e.code)]: false }))
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    document.addEventListener('keyup', handleKeyUp)
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown)
+      document.removeEventListener('keyup', handleKeyUp)
+    }
+  }, [])
+  return movement
+}
