@@ -1,7 +1,8 @@
 import { Suspense } from 'react'
 import Map from './components/Map'
 
-import Player from './components/Player'
+// import Player from './components/Player'
+import Player from './components/PlayerTwo'
 // import Anvil from './components/Anvil'
 
 const App = () => {
